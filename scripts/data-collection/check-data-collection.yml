@@ -1,0 +1,9 @@
+#!/usr/bin/env ansible-playbook
+
+- name: Check data collector output
+  hosts: bitflow-collector
+  tasks:
+    - include_role:
+        name: ../../roles/bitflow-collector
+        tasks_from: check-data-directory
+

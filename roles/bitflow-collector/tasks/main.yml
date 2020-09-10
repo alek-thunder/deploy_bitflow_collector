@@ -1,0 +1,33 @@
+
+- name: create collector directories on host
+  file:
+    path: "{{ collector.path }}/data"
+    state: directory
+
+- name: start the collector docker container
+  tags: [ docker-container, collector ]
+  docker_container:
+    image: "{{ collector.image }}"
+    name: "{{ collector.container_name }}"
+    hostname: "{{ inventory_hostname }}"
+    state: started
+    pid_mode: host
+    network_mode: host
+    pull: true
+    privileged: "yes"
+    restart_policy: always
+    ports:
+    - "{{ collector.api_port }}:{{ collector.api_port }}"
+    - "{{ collector.http_data_port }}:{{ collector.http_data_port }}"
+    volumes:
+      - "{{ collector.libvirt.socket }}:{{ collector.libvirt.socket_mounted }}"
+      - "{{ collector.path }}:{{ collector.path_mounted }}"
+      - "/etc/localtime:/etc/localtime:ro"
+    command: |
+      -files-buf 256
+      -files-check-output 2s
+      -ci 500ms
+      -si 500ms
+      -api :{{ collector.api_port }}
+      -o files://{{ collector.path_mounted }}/data/${component}/data.bin
+      {{ collector.extra_args }}

@@ -1,0 +1,11 @@
+#!/usr/bin/env ansible-playbook
+
+- import_playbook: reset-collector-injector.yml
+
+- name: Delete collector data
+  hosts: bitflow-collector
+  tasks:
+    - include_role:
+        name: ../../roles/bitflow-collector
+        tasks_from: clean-data
+

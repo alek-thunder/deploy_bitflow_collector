@@ -1,0 +1,9 @@
+#!/usr/bin/env ansible-playbook
+
+- name: Enable file output of data collectors
+  hosts: bitflow-collector
+  tasks:
+    - include_role:
+        name: ../../roles/bitflow-collector
+        tasks_from: enable-data-collection
+

@@ -1,0 +1,8 @@
+#!/usr/bin/env ansible-playbook
+
+- name: Install Bitflow collector
+  hosts: bitflow-collector
+  become: yes
+  roles:
+    - ../roles/bitflow-collector
+
