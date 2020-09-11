@@ -1,0 +1,13 @@
+tags(tags={ node='{{ ansible_hostname }}' })
+-> split(regex='^libvirt/(?P<vm>[^/]*)/')
+-> fork_tag(tag=vm, regex=true) {
+
+    # With 'vm' tag
+    '.+' 
+        -> tags(tags={ layer=virtual, component='${node}-${vm}' })
+        -> drop();
+
+    # Without 'vm' tag
+    '^$'
+        -> tags(tags={ layer=physical, component='${node}' });
+}

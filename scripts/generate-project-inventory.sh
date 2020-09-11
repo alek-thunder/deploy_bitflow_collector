@@ -7,6 +7,7 @@ where:
     -p|--prefix         Prefix to indentify testbed VMs and networks. Should be the same as the one used at the heat stack creation. Required option.
     --hypervisors       Generate inventory entries for hypervisor nodes. Note that you must have admin rights in OpenStack. 
                         Otherwise enabling this option will cause the script to fail.
+    --controller        Generate an inventory entry for controller node (it is assumed only 1 controller exists and the authentification service is locates there).
     --vms               Output a [vms:children] group containing all generated hosts
     -h|--help           Print this help message."
 
@@ -14,12 +15,14 @@ function warn() { >&2 echo $@; }
 
 PREFIX=""
 GENERATE_HYPERVISOR_ENTRIES=false
+GENERATE_CONTROLLER_GROUP=false
 GENERATE_VMS_GROUP=false
 while [[ $# -gt 0 ]]; do
     key="$1"
     case $key in
         -p|--prefix) PREFIX="$2"; shift 2 ;;
         --hypervisors) GENERATE_HYPERVISOR_ENTRIES=true; shift ;;
+        --controller) GENERATE_CONTROLLER_GROUP=true; shift ;;
         --vms) GENERATE_VMS_GROUP=true; shift ;;
         -h|--help) warn $usage; exit 0 ;;
         *) warn "Bad parametrization."; warn $usage; exit -1 ;;
@@ -32,10 +35,12 @@ function output_group() {
     shift
     if [ "$NAME" = "hypervisors" ]; then
         local HOST_TYPE="hypervisor"
+    elif [ "$NAME" = "controllers" ]; then
+        local HOST_TYPE="controller"
     else
         local HOST_TYPE="vm"
     fi
-
+    
     sorted_hosts=$(echo $@ | tr  [:space:] '\n' | sort -V)
     for host in $sorted_hosts; do
         local PUBLIC_IP="${PUBLIC_IPS[$host]}"
@@ -70,19 +75,28 @@ declare -A HYPERVISOR_LIST
 declare -A LIBVIRT_IDS
 HYPERVISORS=""
 ALL_VMS=""
+CONTROLLER=""
 
 if $GENERATE_HYPERVISOR_ENTRIES ; then
     warn "Querying hypervisor information..."
     HYPERVISOR_INFO=$(openstack hypervisor list -f json)
     for ID in $(echo "$HYPERVISOR_INFO" | jq -rM '.[]."ID"' | tr '\n' ' '); do
 	    warn "Querying info of hypervisor '$ID'..."
-	    INFO=$(openstack hypervisor show $ID -f json -c hypervisor_hostname -c service_host)
+	    INFO=$(openstack hypervisor show $ID -f json -c hypervisor_hostname -c service_host -c host_ip)
 	    HYPERVISOR=$(echo "$INFO" | jq -rM '.service_host')
-	    HYPERVISOR_HOSTNAME=$(echo "$INFO" | jq -rM '.hypervisor_hostname')
+	    HYPERVISOR_HOSTNAME=$(echo "$INFO" | jq -rM '.host_ip')
 	    PUBLIC_IPS["$HYPERVISOR"]=$HYPERVISOR_HOSTNAME
 	    HYPERVISORS="$HYPERVISORS $HYPERVISOR"
     done
 fi
+
+if $GENERATE_CONTROLLER_GROUP ; then
+    warn "Querying controller information..."
+    CONTROLLER="openstack_controller"
+    PUBLIC_IPS["$CONTROLLER"]=$(openstack configuration show -f json -c auth.auth_url | jq -rM '."auth.auth_url"' | awk -F/ '{print $3}' | awk -F: '{print $1}')
+fi
+
+
 
 HOST_INFO=$(openstack host list -f json)
 while read -r hy_zone; do
@@ -152,3 +166,9 @@ fi
 if $GENERATE_HYPERVISOR_ENTRIES; then
     output_group "hypervisors" $HYPERVISORS
 fi
+if $GENERATE_CONTROLLER_GROUP ; then
+    output_group "controllers" $CONTROLLER
+fi
+
+
+
